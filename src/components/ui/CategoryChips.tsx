@@ -18,14 +18,16 @@ export default function CategoryChips({
   active,
   onToggle,
   onReset,
+  testId,
 }: {
   active: Set<string>;
   onToggle: (c: string) => void;
   onReset: () => void;
+  testId?: string;
 }) {
   const allOn = active.size === ORDER.length;
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2">
+    <div className="flex flex-wrap items-center justify-center gap-2" data-testid={testId}>
       {ORDER.map((c) => {
         const on = active.has(c);
         const color = CATEGORY_COLORS[c];

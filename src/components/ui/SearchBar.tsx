@@ -9,9 +9,10 @@ interface Props {
   query: string;
   onQuery: (q: string) => void;
   onPick: (id: string) => void;
+  testId?: string;
 }
 
-export default function SearchBar({ nodes, query, onQuery, onPick }: Props) {
+export default function SearchBar({ nodes, query, onQuery, onPick, testId }: Props) {
   const [open, setOpen] = useState(false);
 
   const results = useMemo(() => {
@@ -28,6 +29,7 @@ export default function SearchBar({ nodes, query, onQuery, onPick }: Props) {
       <div className="glass ripple-btn flex items-center gap-3 rounded-full py-3 pl-5 pr-3 shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
         <Search size={16} className="shrink-0 text-ash" />
         <input
+          data-testid={testId}
           value={query}
           onChange={(e) => {
             onQuery(e.target.value);

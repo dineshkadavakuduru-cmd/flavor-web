@@ -68,18 +68,36 @@ export default function Home() {
               Flavor <span className="aurora-text font-semibold">Web</span>
             </h1>
           </div>
-          <SearchBar nodes={nodes} query={query} onQuery={setQuery} onPick={setSelectedId} />
+          <SearchBar
+            nodes={nodes}
+            query={query}
+            onQuery={setQuery}
+            onPick={setSelectedId}
+            testId="search-input"
+          />
         </div>
         <div className="pointer-events-auto hidden w-full max-w-3xl justify-center md:flex">
-          <CategoryChips active={activeCategories} onToggle={toggleCategory} onReset={() => setActiveCategories(new Set(ALL))} />
+          <CategoryChips
+            active={activeCategories}
+            onToggle={toggleCategory}
+            onReset={() => setActiveCategories(new Set(ALL))}
+            testId="category-chips-desktop"
+          />
         </div>
       </header>
 
-      <div className="absolute inset-x-0 top-[132px] z-40 flex justify-center px-4 md:hidden">
-        <div className="glass max-w-full overflow-x-auto rounded-full px-2 py-1.5">
-          <CategoryChips active={activeCategories} onToggle={toggleCategory} onReset={() => setActiveCategories(new Set(ALL))} />
+      {isMobile && (
+        <div className="absolute inset-x-0 top-[132px] z-40 flex justify-center px-4">
+          <div className="glass max-w-full overflow-x-auto rounded-full px-2 py-1.5">
+            <CategoryChips
+              active={activeCategories}
+              onToggle={toggleCategory}
+              onReset={() => setActiveCategories(new Set(ALL))}
+              testId="category-chips-mobile"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="pointer-events-none absolute bottom-24 right-4 top-36 z-40 hidden w-[380px] max-w-[calc(100vw-2rem)] md:block">
         <DetailPanel node={selected} pairings={pairings} nodeById={nodeById} onClose={() => setSelectedId(null)} onPick={setSelectedId} />
