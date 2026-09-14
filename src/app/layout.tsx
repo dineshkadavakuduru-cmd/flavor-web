@@ -7,6 +7,7 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
   variable: "--font-space-grotesk",
   display: "swap",
+  preload: true,
 });
 
 const jetBrainsMono = JetBrains_Mono({
@@ -14,6 +15,7 @@ const jetBrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
   variable: "--font-jetbrains-mono",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -46,10 +48,32 @@ export const metadata: Metadata = {
   },
 };
 
+// next/font marks these Space Grotesk (font-grotesk) latin woff2 files with the
+// ".p." (preload) suffix, but Next 14 doesn't emit <link rel="preload"> tags in
+// the static HTML shell. Preload them explicitly so the primary font doesn't
+// arrive late and cause a FOUT. Hashes change only if the Google font version
+// changes — keep in sync with .next/static/media (see @font-face in built CSS).
+const FONT_GROTESK_PRELOADS = [
+  "/_next/static/media/36966cca54120369-s.p.woff2",
+  "/_next/static/media/558ca1a6aa3cb55e-s.p.woff2",
+];
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${jetBrainsMono.variable}`}>
-      <body className="bg-void-950 font-grotesk text-bone antialiased">{children}</body>
+      <body className="bg-void-950 font-grotesk text-bone antialiased">
+        {FONT_GROTESK_PRELOADS.map((href) => (
+          <link
+            key={href}
+            rel="preload"
+            href={href}
+            as="font"
+            type="font/woff2"
+            crossOrigin="anonymous"
+          />
+        ))}
+        {children}
+      </body>
     </html>
   );
 }

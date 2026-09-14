@@ -79,7 +79,7 @@ export function LoadingScreen({
   if (error) {
     const message = typeof error === "string" && error ? error : "The flavor galaxy took too long to condense. Something went wrong.";
     return (
-      <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-6 bg-void-950">
+      <div className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-6 bg-void-950">
         <div className="flex flex-col items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
             <X className="text-red-400" size={28} />
@@ -102,7 +102,7 @@ export function LoadingScreen({
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 bg-void-950">
+    <div className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-5 bg-void-950">
       <Loader2 className="animate-spin text-ember" size={28} />
       <div className="flex flex-col items-center gap-1">
         <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ash">Condensing flavor galaxy</p>

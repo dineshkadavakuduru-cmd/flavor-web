@@ -7,6 +7,7 @@ import type { PositionedNode } from "@/lib/graph";
 
 interface Props {
   nodes: PositionedNode[];
+  onReady?: () => void;
   pairings: Pairing[];
   selectedId: string | null;
   searchQuery: string;
@@ -15,13 +16,14 @@ interface Props {
   isMobile: boolean;
 }
 
-export default function GalaxyCanvas(props: Props) {
+export default function GalaxyCanvas({ onReady, ...props }: Props) {
   return (
     <Canvas
       dpr={props.isMobile ? [1, 1.5] : [1, 2]}
       camera={{ position: [0, 9, 34], fov: 52, near: 0.1, far: 400 }}
       gl={{ antialias: !props.isMobile, alpha: false, powerPreference: "high-performance" }}
       onPointerMissed={() => props.onSelect(null)}
+      onCreated={() => onReady?.()}
     >
       <FlavorGalaxy {...props} />
     </Canvas>

@@ -1,12 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useGraphData } from "@/hooks/useGraphData";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import SearchBar from "@/components/ui/SearchBar";
 import CategoryChips from "@/components/ui/CategoryChips";
 import DetailPanel from "@/components/ui/DetailPanel";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { InfoModal, LoadingScreen, SurpriseButton } from "@/components/ui/Overlays";
 
 const GalaxyCanvas = dynamic(() => import("@/components/3d/GalaxyCanvas"), {
@@ -15,8 +16,9 @@ const GalaxyCanvas = dynamic(() => import("@/components/3d/GalaxyCanvas"), {
 
 const ALL = ["protein", "herb", "spice", "vegetable", "fruit", "dairy", "grain", "other"];
 
-// Max time to wait before showing a timeout error on the loading overlay
-const LOADING_TIMEOUT_MS = 12000;
+// Show the retry/error state if the galaxy isn't ready within this window
+// (covers slow Firestore fetch, slow 3D init, or a stalled load).
+const LOADING_TIMEOUT_MS = 5000;
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -26,31 +28,39 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(ALL));
 
-  // Timeout guard: if data or 3D init takes too long, show error state
+  // --- Loading timeout / fallback state -------------------------------------
   const [timedOut, setTimedOut] = useState(false);
-  const mountStart = useRef<number>(Date.now());
+  const [elapsed, setElapsed] = useState(0);
+  // 3D canvas finished initializing (R3F onCreated)
+  const [canvasReady, setCanvasReady] = useState(false);
+  // 3D canvas crashed (caught by ErrorBoundary) — show the same error state
+  const [canvasError, setCanvasError] = useState(false);
 
+  // Timer starts on mount and restarts on every retry
   useEffect(() => {
-    mountStart.current = Date.now();
-    const timer = setTimeout(() => {
-      setTimedOut(true);
-    }, LOADING_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Reset the timeout whenever loading completes
-  useEffect(() => {
-    if (!loading && nodes.length > 0 && !timedOut) {
-      // Galaxy is ready; no more timeout needed
-    }
-  }, [loading, nodes, timedOut]);
-
-  const handleRetry = () => {
     setTimedOut(false);
-    setRefreshKey((k) => k + 1);
-  };
+    setElapsed(0);
+    const startedAt = Date.now();
+    const tick = setInterval(() => {
+      setElapsed(Date.now() - startedAt);
+    }, 250);
+    const timer = setTimeout(() => setTimedOut(true), LOADING_TIMEOUT_MS);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(timer);
+    };
+  }, [refreshKey]);
 
-  const elapsed = Date.now() - mountStart.current;
+  // Fires when the R3F canvas has initialized (WebGL context created)
+  const handleCanvasReady = useCallback(() => setCanvasReady(true), []);
+  // Fires if the 3D canvas throws during render
+  const handleCanvasError = useCallback(() => setCanvasError(true), []);
+
+  const handleRetry = useCallback(() => {
+    setCanvasReady(false);
+    setCanvasError(false);
+    setRefreshKey((k) => k + 1); // restarts both the data fetch and the timeout
+  }, []);
 
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
@@ -71,25 +81,42 @@ export default function Home() {
     setQuery("");
   };
 
-  const galaxyReady = !loading && nodes.length > 0;
-  const showError = timedOut && !galaxyReady;
+  const dataReady = !loading && nodes.length > 0;
+  // Overlay stays up until data is loaded AND the 3D canvas has initialized.
+  // The canvas mounts behind the opaque overlay as soon as data is ready, so a
+  // slow WebGL init can still succeed after the timeout fires; it is keyed by
+  // refreshKey so retries remount it and onCreated fires again.
+  const galaxyReady = dataReady && canvasReady && !canvasError;
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-void-950">
       <div className="absolute inset-0">
-        {showError ? (
-          <LoadingScreen error={true} onRetry={handleRetry} />
-        ) : !galaxyReady ? (
-          <LoadingScreen elapsed={elapsed} />
-        ) : (
-          <GalaxyCanvas
-            nodes={nodes}
-            pairings={pairings}
-            selectedId={selectedId}
-            searchQuery={query}
-            activeCategories={activeCategories}
-            onSelect={setSelectedId}
-            isMobile={isMobile}
+        {dataReady && !canvasError && (
+          <ErrorBoundary fallback={null} onError={handleCanvasError}>
+            <GalaxyCanvas
+              key={refreshKey}
+              nodes={nodes}
+              pairings={pairings}
+              selectedId={selectedId}
+              searchQuery={query}
+              activeCategories={activeCategories}
+              onSelect={setSelectedId}
+              isMobile={isMobile}
+              onReady={handleCanvasReady}
+            />
+          </ErrorBoundary>
+        )}
+        {!galaxyReady && (
+          <LoadingScreen
+            elapsed={elapsed}
+            error={
+              canvasError
+                ? "The flavor galaxy failed to render (WebGL may be unavailable)."
+                : timedOut
+                  ? "The flavor galaxy took too long to condense."
+                  : false
+            }
+            onRetry={handleRetry}
           />
         )}
       </div>
@@ -124,7 +151,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Desktop detail panel — only render when there's a selection */}
+      {/* Desktop detail panel — only render when there's a selection (keeps it out of SSR output) */}
       {selected && (
         <div className="pointer-events-none absolute bottom-24 right-4 top-36 z-40 hidden w-[380px] max-w-[calc(100vw-2rem)] md:block">
           <DetailPanel node={selected} pairings={pairings} nodeById={nodeById} onClose={() => setSelectedId(null)} onPick={setSelectedId} />
@@ -142,7 +169,7 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <InfoModal />
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-ash sm:block">
-            {galaxyReady ? `${nodes.length} orbs · ${pairings.length} threads` : "—"}
+            {dataReady ? `${nodes.length} orbs · ${pairings.length} threads` : "—"}
           </span>
         </div>
         <SurpriseButton onClick={surprise} />
