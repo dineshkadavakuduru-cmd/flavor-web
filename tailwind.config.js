@@ -20,9 +20,9 @@ module.exports = {
         ash: "#8b93a7",
       },
       fontFamily: {
-        display: ["Space Grotesk", "system-ui", "sans-serif"],
-        grotesk: ["Space Grotesk", "Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        display: ["var(--font-space-grotesk)", "Inter", "system-ui", "sans-serif"],
+        grotesk: ["var(--font-space-grotesk)", "Inter", "system-ui", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
       },
       animation: {
         "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",

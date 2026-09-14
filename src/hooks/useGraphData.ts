@@ -12,7 +12,7 @@ export interface GalaxyData {
   loading: boolean;
 }
 
-export function useGraphData(): GalaxyData {
+export function useGraphData(refreshKey = 0): GalaxyData {
   const [nodes, setNodes] = useState<PositionedNode[]>([]);
   const [pairings, setPairings] = useState<Pairing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +62,7 @@ export function useGraphData(): GalaxyData {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
   return { nodes, pairings, loading };
 }

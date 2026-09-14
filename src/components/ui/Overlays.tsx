@@ -1,14 +1,14 @@
 "use client";
 
-import { Dices, Info, Loader2, X } from "lucide-react";
-import { useState } from "react";
+import { Dices, Info, Loader2, RefreshCw, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function SurpriseButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className="glass ripple-btn magnetic group flex items-center gap-2.5 rounded-full py-3 pl-4 pr-5"
-      style={{ boxShadow: "0 0 24px rgba(255,179,71,0.18), 0 8px 40px rgba(0,0,0,0.5)" }}
+      style={{ boxShadow: "0 0 24px rgba(255,179,71,0.18), 0 0 40px rgba(0,0,0,0.5)" }}
     >
       <Dices size={16} className="text-ember transition-transform duration-300 group-hover:rotate-180" />
       <span className="font-mono text-[12px] uppercase tracking-[0.18em] text-bone">Surprise me</span>
@@ -58,11 +58,60 @@ export function InfoModal() {
   );
 }
 
-export function LoadingScreen() {
+/** Full-screen loading overlay with a built-in timeout.
+ *  Props:
+ *    - elapsed?: number (ms to show in the "still loading" message)
+ *    - error?: boolean | string  — true means a timeout/failure occurred
+ *    - onRetry?: () => void      — retry handler shown in the error state
+ **/
+export function LoadingScreen({
+  elapsed,
+  error = false,
+  onRetry,
+}: {
+  elapsed?: number;
+  error?: boolean | string;
+  onRetry?: () => void;
+}) {
+  // Human-readable elapsed time for the still-loading state
+  const seconds = elapsed !== undefined ? Math.floor(elapsed / 1000) : 0;
+
+  if (error) {
+    const message = typeof error === "string" && error ? error : "The flavor galaxy took too long to condense. Something went wrong.";
+    return (
+      <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-6 bg-void-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
+            <X className="text-red-400" size={28} />
+          </div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ash">
+            {message}
+          </p>
+        </div>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="glass ripple-btn magnetic flex items-center gap-2 rounded-full px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.16em] text-bone"
+          >
+            <RefreshCw size={14} className="text-ember" />
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 bg-void-950">
       <Loader2 className="animate-spin text-ember" size={28} />
-      <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ash">Condensing flavor galaxy</p>
+      <div className="flex flex-col items-center gap-1">
+        <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-ash">Condensing flavor galaxy</p>
+        {seconds > 0 && (
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ash/60">
+            ({seconds}s elapsed)
+          </span>
+        )}
+      </div>
     </div>
   );
 }

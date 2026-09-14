@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGraphData } from "@/hooks/useGraphData";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import SearchBar from "@/components/ui/SearchBar";
@@ -11,17 +11,46 @@ import { InfoModal, LoadingScreen, SurpriseButton } from "@/components/ui/Overla
 
 const GalaxyCanvas = dynamic(() => import("@/components/3d/GalaxyCanvas"), {
   ssr: false,
-  loading: () => <LoadingScreen />,
 });
 
 const ALL = ["protein", "herb", "spice", "vegetable", "fruit", "dairy", "grain", "other"];
 
+// Max time to wait before showing a timeout error on the loading overlay
+const LOADING_TIMEOUT_MS = 12000;
+
 export default function Home() {
-  const { nodes, pairings, loading } = useGraphData();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { nodes, pairings, loading } = useGraphData(refreshKey);
   const isMobile = useIsMobile();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(ALL));
+
+  // Timeout guard: if data or 3D init takes too long, show error state
+  const [timedOut, setTimedOut] = useState(false);
+  const mountStart = useRef<number>(Date.now());
+
+  useEffect(() => {
+    mountStart.current = Date.now();
+    const timer = setTimeout(() => {
+      setTimedOut(true);
+    }, LOADING_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Reset the timeout whenever loading completes
+  useEffect(() => {
+    if (!loading && nodes.length > 0 && !timedOut) {
+      // Galaxy is ready; no more timeout needed
+    }
+  }, [loading, nodes, timedOut]);
+
+  const handleRetry = () => {
+    setTimedOut(false);
+    setRefreshKey((k) => k + 1);
+  };
+
+  const elapsed = Date.now() - mountStart.current;
 
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
@@ -42,10 +71,17 @@ export default function Home() {
     setQuery("");
   };
 
+  const galaxyReady = !loading && nodes.length > 0;
+  const showError = timedOut && !galaxyReady;
+
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-void-950">
       <div className="absolute inset-0">
-        {!loading && nodes.length > 0 ? (
+        {showError ? (
+          <LoadingScreen error={true} onRetry={handleRetry} />
+        ) : !galaxyReady ? (
+          <LoadingScreen elapsed={elapsed} />
+        ) : (
           <GalaxyCanvas
             nodes={nodes}
             pairings={pairings}
@@ -55,8 +91,6 @@ export default function Home() {
             onSelect={setSelectedId}
             isMobile={isMobile}
           />
-        ) : (
-          <LoadingScreen />
         )}
       </div>
 
@@ -76,35 +110,30 @@ export default function Home() {
             testId="search-input"
           />
         </div>
-        <div className="pointer-events-auto hidden w-full max-w-3xl justify-center md:flex">
-          <CategoryChips
-            active={activeCategories}
-            onToggle={toggleCategory}
-            onReset={() => setActiveCategories(new Set(ALL))}
-            testId="category-chips-desktop"
-          />
-        </div>
-      </header>
 
-      {isMobile && (
-        <div className="absolute inset-x-0 top-[132px] z-40 flex justify-center px-4">
-          <div className="glass max-w-full overflow-x-auto rounded-full px-2 py-1.5">
+        {/* Category chips — single horizontal scroll row, visible on all breakpoints */}
+        <div className="pointer-events-auto w-full max-w-3xl overflow-x-auto">
+          <div className="flex w-max items-center justify-center gap-2 px-1 py-1.5">
             <CategoryChips
               active={activeCategories}
               onToggle={toggleCategory}
               onReset={() => setActiveCategories(new Set(ALL))}
-              testId="category-chips-mobile"
+              testId="category-chips"
             />
           </div>
         </div>
+      </header>
+
+      {/* Desktop detail panel — only render when there's a selection */}
+      {selected && (
+        <div className="pointer-events-none absolute bottom-24 right-4 top-36 z-40 hidden w-[380px] max-w-[calc(100vw-2rem)] md:block">
+          <DetailPanel node={selected} pairings={pairings} nodeById={nodeById} onClose={() => setSelectedId(null)} onPick={setSelectedId} />
+        </div>
       )}
 
-      <div className="pointer-events-none absolute bottom-24 right-4 top-36 z-40 hidden w-[380px] max-w-[calc(100vw-2rem)] md:block">
-        <DetailPanel node={selected} pairings={pairings} nodeById={nodeById} onClose={() => setSelectedId(null)} onPick={setSelectedId} />
-      </div>
-
-      {selected && (
-        <div className="absolute inset-x-3 bottom-20 z-40 md:hidden">
+      {/* Mobile detail panel */}
+      {selected && isMobile && (
+        <div className="pointer-events-auto absolute inset-x-3 bottom-20 z-50 md:hidden">
           <DetailPanel node={selected} pairings={pairings} nodeById={nodeById} onClose={() => setSelectedId(null)} onPick={setSelectedId} />
         </div>
       )}
@@ -113,14 +142,14 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <InfoModal />
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-ash sm:block">
-            {nodes.length} orbs · {pairings.length} threads
+            {galaxyReady ? `${nodes.length} orbs · ${pairings.length} threads` : "—"}
           </span>
         </div>
         <SurpriseButton onClick={surprise} />
       </footer>
 
-      {selected && (
-        <div className="pointer-events-none absolute left-4 top-1/2 z-30 hidden max-w-md -translate-y-1/2 lg:block">
+      {selected && !isMobile && (
+        <div className="pointer-events-auto absolute left-4 top-1/2 z-30 hidden max-w-md -translate-y-1/2 lg:block">
           <p key={`k-${selected.id}`} className="cinematic-reveal">
             <span className="font-mono text-[11px] uppercase tracking-[0.3em]" style={{ color: selected.color }}>
               Now entering orbit
