@@ -4,4 +4,9 @@ out/
 .env*.local
 .vercel
 
-.vercel
+# typescript build info
+*.tsbuildinfo
+
+# misc
+.DS_Store
+npm-debug.log*
