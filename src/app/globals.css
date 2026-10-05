@@ -79,6 +79,26 @@ body::after {
   transform: translateY(-1px);
 }
 
+/* Focus visible styles for accessibility */
+*:focus-visible {
+  outline: 2px solid #ffb347;
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #ffb347;
+  outline-offset: 2px;
+}
+
+.search-result:focus-visible,
+.category-chip:focus-visible,
+.detail-link:focus-visible {
+  outline: 2px solid #ffb347;
+  outline-offset: 2px;
+}
+
 .scroll-slim::-webkit-scrollbar {
   width: 5px;
 }
@@ -100,5 +120,13 @@ canvas {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  
+  .cinematic-reveal {
+    animation: none !important;
+  }
+  
+  .aurora-text {
+    animation: none !important;
   }
 }

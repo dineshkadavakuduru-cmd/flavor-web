@@ -27,7 +27,7 @@ export default function CategoryChips({
 }) {
   const allOn = active.size === ORDER.length;
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2" data-testid={testId}>
+    <div className="flex flex-wrap items-center justify-center gap-2" data-testid={testId} role="group" aria-label="Ingredient category filters">
       {ORDER.map((c) => {
         const on = active.has(c);
         const color = CATEGORY_COLORS[c];
@@ -36,7 +36,7 @@ export default function CategoryChips({
             key={c}
             onClick={() => onToggle(c)}
             className={cn(
-              "tilt-pill rounded-full border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] backdrop-blur-md",
+              "category-chip tilt-pill rounded-full border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] backdrop-blur-md",
               on ? "text-bone" : "border-white/10 bg-white/[0.03] text-ash hover:text-bone"
             )}
             style={
@@ -48,10 +48,13 @@ export default function CategoryChips({
                   }
                 : undefined
             }
+            aria-pressed={on}
+            aria-label={`${CATEGORY_LABELS[c]} category filter`}
           >
             <span
               className="mr-2 inline-block h-1.5 w-1.5 rounded-full"
               style={{ background: color, boxShadow: `0 0 8px ${color}`, opacity: on ? 1 : 0.35 }}
+              aria-hidden="true"
             />
             {CATEGORY_LABELS[c]}
           </button>
@@ -60,7 +63,8 @@ export default function CategoryChips({
       {!allOn && (
         <button
           onClick={onReset}
-          className="rounded-full px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-ash underline-offset-4 hover:text-bone hover:underline"
+          className="rounded-full px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-ash underline-offset-4 hover:text-bone hover:underline focus-visible:outline-none"
+          aria-label="Reset all category filters"
         >
           Reset
         </button>

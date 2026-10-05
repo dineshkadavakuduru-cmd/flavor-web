@@ -22,12 +22,15 @@ export const metadata: Metadata = {
   title: "Flavor Web — 3D Ingredient Pairing Explorer",
   description:
     "A living constellation of flavor. Search an ingredient, fly to it, and see what it loves.",
-  metadataBase: new URL("https://food-jet-delta.vercel.app"),
+  metadataBase: new URL("https://flavor-web.vercel.app"),
+  alternates: {
+    canonical: "https://flavor-web.vercel.app/",
+  },
   openGraph: {
     title: "Flavor Web — 3D Ingredient Pairing Explorer",
     description:
       "A living constellation of flavor. Search an ingredient, fly to it, and see what it loves.",
-    url: "https://food-jet-delta.vercel.app",
+    url: "https://flavor-web.vercel.app/",
     type: "website",
     locale: "en_US",
     images: [
@@ -44,8 +47,18 @@ export const metadata: Metadata = {
     title: "Flavor Web — 3D Ingredient Pairing Explorer",
     description:
       "A living constellation of flavor. Search an ingredient, fly to it, and see what it loves.",
-    images: ["/og-image.png"],
+    images: ["https://flavor-web.vercel.app/og-image.png"],
   },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
+  manifest: "/manifest.json",
 };
 
 // next/font marks these Space Grotesk (font-grotesk) latin woff2 files with the

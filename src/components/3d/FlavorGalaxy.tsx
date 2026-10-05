@@ -185,7 +185,7 @@ function EdgeField({
       return g;
     };
     return { solid: mk(solidPos, solidCol), dashed: mk(dashPos, dashCol) };
-  }, [nodes, pairings, byId, selectedId]);
+  }, [pairings, byId, selectedId]);
 
   useLayoutEffect(() => {
     dashRef.current?.computeLineDistances();

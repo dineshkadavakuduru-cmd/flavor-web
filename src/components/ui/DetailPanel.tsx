@@ -38,10 +38,13 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
       key={node.id}
       className="glass cinematic-reveal pointer-events-auto relative w-full max-w-[380px] overflow-hidden rounded-2xl"
       style={{ borderTop: `3px solid ${node.color}` }}
+      role="region"
+      aria-label={`${node.name} details`}
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-25"
         style={{ background: `radial-gradient(60% 100% at 50% 0%, ${node.color}, transparent)` }}
+        aria-hidden="true"
       />
       <div className="relative p-6">
         <div className="flex items-start justify-between gap-4">
@@ -50,7 +53,7 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
           </p>
           <button
             onClick={onClose}
-            className="magnetic rounded-full p-1.5 text-ash hover:bg-white/10 hover:text-bone"
+            className="magnetic rounded-full p-1.5 text-ash hover:bg-white/10 hover:text-bone focus-visible:outline-none"
             aria-label="Close panel"
           >
             <X size={16} />
@@ -64,7 +67,7 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
           {node.description}
         </p>
 
-        <div className="mt-5 flex items-center gap-4 border-y border-white/[0.07] py-3">
+        <div className="mt-5 flex items-center gap-4 border-y border-white/[0.07] py-3" role="group" aria-label="Pairing strength legend">
           {(["classic", "strong", "experimental"] as const).map((s) => (
             <span key={s} className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ash">
               <span
@@ -74,27 +77,31 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
                   background: strengthDot[s],
                   opacity: STRENGTH_CONFIG[s].opacity,
                 }}
+                aria-hidden="true"
               />
               {s}
             </span>
           ))}
         </div>
 
-        <div className="scroll-slim mt-2 max-h-[38vh] overflow-y-auto pr-1">
+        <div className="scroll-slim mt-2 max-h-[38vh] overflow-y-auto pr-1" role="list" aria-label={`${node.name} pairings`}>
           {related.map(({ pairing, other }) => (
             <button
               key={pairing.id}
               onClick={() => onPick(other.id)}
-              className="group flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
+              className="detail-link group flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
+              role="listitem"
+              aria-label={`${other.name}, ${pairing.strength === "classic" ? "Classic" : pairing.strength === "strong" ? "Strong" : "Lab"} pairing${pairing.note ? `, ${pairing.note}` : ""}`}
             >
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
                 style={{ background: other.color, boxShadow: `0 0 10px ${other.color}` }}
+                aria-hidden="true"
               />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1 font-grotesk text-sm text-bone">
                   {other.name}
-                  <ArrowUpRight size={13} className="opacity-0 transition-opacity group-hover:opacity-70" />
+                  <ArrowUpRight size={13} className="opacity-0 transition-opacity group-hover:opacity-70" aria-hidden="true" />
                 </span>
                 {pairing.note && (
                   <span className="block truncate font-grotesk text-xs text-ash">{pairing.note}</span>
@@ -111,7 +118,7 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
         </div>
 
         <div className="mt-4 flex items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2.5">
-          <Sparkles size={14} style={{ color: node.color }} />
+          <Sparkles size={14} style={{ color: node.color }} aria-hidden="true" />
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ash">
             Color is the language — {CATEGORY_LABELS[node.category]} glow
           </p>

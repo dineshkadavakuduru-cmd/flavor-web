@@ -1,13 +1,13 @@
 "use client";
 
 import { Dices, Info, Loader2, RefreshCw, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export function SurpriseButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="glass ripple-btn magnetic group flex items-center gap-2.5 rounded-full py-3 pl-4 pr-5"
+      className="glass ripple-btn magnetic group flex items-center gap-2.5 rounded-full py-3 pl-4 pr-5 focus-visible:outline-none"
       style={{ boxShadow: "0 0 24px rgba(255,179,71,0.18), 0 0 40px rgba(0,0,0,0.5)" }}
     >
       <Dices size={16} className="text-ember transition-transform duration-300 group-hover:rotate-180" />
