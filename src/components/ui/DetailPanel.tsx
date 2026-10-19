@@ -16,7 +16,13 @@ interface Props {
 const strengthDot: Record<Pairing["strength"], string> = {
   classic: "#ffe9c4",
   strong: "#9db4d8",
-  experimental: "#8b93a7",
+  experimental: "#9ba2b4",
+};
+
+const STRENGTH_LABEL: Record<Pairing["strength"], string> = {
+  classic: "Classic",
+  strong: "Strong",
+  experimental: "Lab",
 };
 
 export default function DetailPanel({ node, pairings, nodeById, onClose, onPick }: Props) {
@@ -33,9 +39,14 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
       return order[a.pairing.strength] - order[b.pairing.strength];
     });
 
+  // Longest curated name is 19 chars ("Portobello Mushroom"); anything past
+  // that steps the display size down instead of overflowing the sheet.
+  const longName = node.name.length > 14;
+
   return (
     <aside
       key={node.id}
+      data-testid="detail-panel"
       className="glass cinematic-reveal pointer-events-auto relative w-full max-w-[380px] overflow-hidden rounded-2xl"
       style={{ borderTop: `3px solid ${node.color}` }}
       role="region"
@@ -46,30 +57,41 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
         style={{ background: `radial-gradient(60% 100% at 50% 0%, ${node.color}, transparent)` }}
         aria-hidden="true"
       />
-      <div className="relative p-6">
+      <div className="relative max-h-[70dvh] overflow-y-auto scroll-slim p-6">
         <div className="flex items-start justify-between gap-4">
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-ash">
             {CATEGORY_LABELS[node.category]} · {node.pairingCount ?? 0} pairings
           </p>
           <button
             onClick={onClose}
-            className="magnetic rounded-full p-1.5 text-ash hover:bg-white/10 hover:text-bone focus-visible:outline-none"
+            className="magnetic shrink-0 rounded-full p-1.5 text-ash hover:bg-white/10 hover:text-bone focus-visible:outline-none"
             aria-label="Close panel"
           >
             <X size={16} />
           </button>
         </div>
 
-        <h2 className="font-display mt-2 text-4xl font-semibold leading-[1.02] text-bone">
+        <h2
+          className={`font-display mt-2 font-semibold leading-[1.05] text-bone [overflow-wrap:anywhere] ${
+            longName ? "text-3xl" : "text-4xl"
+          }`}
+        >
           {node.name}
         </h2>
         <p className="mt-3 font-grotesk text-[14px] leading-relaxed text-bone/75">
           {node.description}
         </p>
 
-        <div className="mt-5 flex items-center gap-4 border-y border-white/[0.07] py-3" role="group" aria-label="Pairing strength legend">
+        <div
+          className="mt-5 flex flex-wrap items-center gap-4 border-y border-white/[0.07] py-3"
+          role="group"
+          aria-label="Pairing strength legend"
+        >
           {(["classic", "strong", "experimental"] as const).map((s) => (
-            <span key={s} className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ash">
+            <span
+              key={s}
+              className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ash"
+            >
               <span
                 className="inline-block h-[3px] rounded-full"
                 style={{
@@ -84,38 +106,59 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
           ))}
         </div>
 
-        <div className="scroll-slim mt-2 max-h-[38vh] overflow-y-auto pr-1" role="list" aria-label={`${node.name} pairings`}>
-          {related.map(({ pairing, other }) => (
-            <button
-              key={pairing.id}
-              onClick={() => onPick(other.id)}
-              className="detail-link group flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
-              role="listitem"
-              aria-label={`${other.name}, ${pairing.strength === "classic" ? "Classic" : pairing.strength === "strong" ? "Strong" : "Lab"} pairing${pairing.note ? `, ${pairing.note}` : ""}`}
-            >
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: other.color, boxShadow: `0 0 10px ${other.color}` }}
-                aria-hidden="true"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1 font-grotesk text-sm text-bone">
-                  {other.name}
-                  <ArrowUpRight size={13} className="opacity-0 transition-opacity group-hover:opacity-70" aria-hidden="true" />
-                </span>
-                {pairing.note && (
-                  <span className="block truncate font-grotesk text-xs text-ash">{pairing.note}</span>
-                )}
-              </span>
-              <span
-                className="shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em]"
-                style={{ borderColor: `${strengthDot[pairing.strength]}44`, color: strengthDot[pairing.strength] }}
+        {related.length === 0 ? (
+          <p className="mt-4 font-mono text-[10px] uppercase leading-relaxed tracking-[0.16em] text-ash">
+            Nothing links to this orb yet — it is floating alone in the galaxy.
+          </p>
+        ) : (
+          <div
+            className="scroll-slim mt-2 max-h-[38vh] overflow-y-auto pr-1"
+            role="list"
+            aria-label={`${node.name} pairings`}
+          >
+            {related.map(({ pairing, other }) => (
+              <button
+                key={pairing.id}
+                onClick={() => onPick(other.id)}
+                className="detail-link group flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
+                role="listitem"
+                aria-label={`${other.name}, ${STRENGTH_LABEL[pairing.strength]} pairing${pairing.note ? `, ${pairing.note}` : ""}`}
               >
-                {pairing.strength === "classic" ? "Classic" : pairing.strength === "strong" ? "Strong" : "Lab"}
-              </span>
-            </button>
-          ))}
-        </div>
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: other.color, boxShadow: `0 0 10px ${other.color}` }}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1 font-grotesk text-sm text-bone">
+                    <span className="truncate" title={other.name}>
+                      {other.name}
+                    </span>
+                    <ArrowUpRight
+                      size={13}
+                      className="shrink-0 opacity-0 transition-opacity group-hover:opacity-70"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  {pairing.note && (
+                    <span className="block truncate font-grotesk text-xs text-ash">
+                      {pairing.note}
+                    </span>
+                  )}
+                </span>
+                <span
+                  className="shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em]"
+                  style={{
+                    borderColor: `${strengthDot[pairing.strength]}44`,
+                    color: strengthDot[pairing.strength],
+                  }}
+                >
+                  {STRENGTH_LABEL[pairing.strength]}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="mt-4 flex items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2.5">
           <Sparkles size={14} style={{ color: node.color }} aria-hidden="true" />

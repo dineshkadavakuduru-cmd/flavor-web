@@ -18,10 +18,30 @@ interface GalaxyProps {
   activeCategories: Set<string>;
   onSelect: (id: string | null) => void;
   isMobile: boolean;
+  /** Bloom + vignette. Already false on mobile, low-power devices and reduced motion. */
+  allowPostProcessing: boolean;
+  /** prefers-reduced-motion: no idle spin, no bob, no pulse, instant camera flights. */
+  reducedMotion: boolean;
 }
 
 const tmpObj = new THREE.Object3D();
 const tmpColor = new THREE.Color();
+
+/**
+ * Hoisted on purpose. @react-three/postprocessing rebuilds its passes in a
+ * layout effect keyed on `children`; a fresh `<Bloom/><Vignette/>` element on
+ * every render re-runs `EffectComposer.addPass`, which reads
+ * `renderer.getContext().getContextAttributes().alpha`. On a lost WebGL context
+ * that value is null and the whole canvas would be torn down. A stable element
+ * keeps React re-renders (e.g. the context-lost frameloop change) from
+ * rebuilding the composer against a dead renderer.
+ */
+const GALAXY_EFFECTS = (
+  <>
+    <Bloom mipmapBlur intensity={1.15} luminanceThreshold={0.12} luminanceSmoothing={0.2} />
+    <Vignette darkness={0.72} offset={0.22} />
+  </>
+);
 
 function dimFactor(
   node: PositionedNode,
@@ -46,6 +66,7 @@ function NodeField({
   searchQuery,
   activeCategories,
   spinGroup,
+  reducedMotion,
   onSelect,
 }: GalaxyProps & { spinGroup: React.RefObject<THREE.Group> }) {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
@@ -63,7 +84,10 @@ function NodeField({
   }, [nodes]);
 
   useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
+    // Frozen at t=0 under reduced motion: pulse collapses to 1, bob to 0 and
+    // the per-instance rotation to zero, so the field keeps its composed look
+    // without any ambient movement.
+    const t = reducedMotion ? 0 : clock.getElapsedTime();
     const mesh = meshRef.current;
     if (!mesh) return;
     nodes.forEach((n, i) => {
@@ -112,7 +136,7 @@ function NodeField({
       if (halo.instanceColor) halo.instanceColor.needsUpdate = true;
     }
 
-    if (spinGroup.current && !selectedId) {
+    if (spinGroup.current && !selectedId && !reducedMotion) {
       spinGroup.current.rotation.y += 0.0009;
     }
   });
@@ -154,7 +178,8 @@ function EdgeField({
   nodes,
   pairings,
   selectedId,
-}: Pick<GalaxyProps, "nodes" | "pairings" | "selectedId">) {
+  reducedMotion,
+}: Pick<GalaxyProps, "nodes" | "pairings" | "selectedId" | "reducedMotion">) {
   const solidRef = useRef<THREE.LineSegments>(null!);
   const dashRef = useRef<THREE.LineSegments>(null!);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
@@ -192,7 +217,7 @@ function EdgeField({
   }, [dashed]);
 
   useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
+    const t = reducedMotion ? 0 : clock.getElapsedTime();
     if (solidRef.current) {
       (solidRef.current.material as THREE.LineBasicMaterial).opacity = 0.55 + Math.sin(t * 1.4) * 0.2;
     }
@@ -217,10 +242,12 @@ function CameraRig({
   nodes,
   selectedId,
   controlsRef,
+  reducedMotion,
 }: {
   nodes: PositionedNode[];
   selectedId: string | null;
   controlsRef: React.RefObject<OrbitControlsImpl>;
+  reducedMotion: boolean;
 }) {
   const anim = useRef<{ t: number; fromP: THREE.Vector3; toP: THREE.Vector3; fromT: THREE.Vector3; toT: THREE.Vector3 } | null>(null);
   const lastSel = useRef<string | null>(null);
@@ -249,7 +276,8 @@ function CameraRig({
     }
     const a = anim.current;
     if (a) {
-      a.t += clock.getDelta() / 1.6;
+      // Reduced motion jumps straight to the destination instead of flying.
+      a.t += reducedMotion ? 1 : clock.getDelta() / 1.6;
       const k = easeInOutCubic(Math.min(a.t, 1));
       camera.position.lerpVectors(a.fromP, a.toP, k);
       if (controls) {
@@ -257,7 +285,7 @@ function CameraRig({
         controls.update();
       }
       if (a.t >= 1) anim.current = null;
-    } else if (!selectedId) {
+    } else if (!selectedId && !reducedMotion) {
       const angle = clock.getElapsedTime() * 0.03;
       const r = 34;
       camera.position.x += (Math.sin(angle) * r - camera.position.x) * 0.002;
@@ -279,14 +307,32 @@ export default function FlavorGalaxy(props: GalaxyProps) {
       <pointLight position={[18, 12, 10]} intensity={60} color="#ffb347" />
       <pointLight position={[-16, -8, -12]} intensity={50} color="#5b8cff" />
 
-      <Stars radius={120} depth={60} count={props.isMobile ? 900 : 2600} factor={3.2} saturation={0} fade speed={0.4} />
+      <Stars
+        radius={120}
+        depth={60}
+        count={props.reducedMotion ? 400 : props.isMobile ? 900 : 2600}
+        factor={3.2}
+        saturation={0}
+        fade
+        speed={props.reducedMotion ? 0 : 0.4}
+      />
 
       <group ref={spinGroup}>
-        <EdgeField nodes={props.nodes} pairings={props.pairings} selectedId={props.selectedId} />
+        <EdgeField
+          nodes={props.nodes}
+          pairings={props.pairings}
+          selectedId={props.selectedId}
+          reducedMotion={props.reducedMotion}
+        />
         <NodeField {...props} spinGroup={spinGroup} />
       </group>
 
-      <CameraRig nodes={props.nodes} selectedId={props.selectedId} controlsRef={controlsRef} />
+      <CameraRig
+        nodes={props.nodes}
+        selectedId={props.selectedId}
+        controlsRef={controlsRef}
+        reducedMotion={props.reducedMotion}
+      />
       <OrbitControls
         ref={controlsRef}
         makeDefault
@@ -298,11 +344,8 @@ export default function FlavorGalaxy(props: GalaxyProps) {
         enablePan={!props.selectedId}
       />
 
-      {!props.isMobile && (
-        <EffectComposer multisampling={0}>
-          <Bloom mipmapBlur intensity={1.15} luminanceThreshold={0.12} luminanceSmoothing={0.2} />
-          <Vignette darkness={0.72} offset={0.22} />
-        </EffectComposer>
+      {props.allowPostProcessing && (
+        <EffectComposer multisampling={0}>{GALAXY_EFFECTS}</EffectComposer>
       )}
     </>
   );

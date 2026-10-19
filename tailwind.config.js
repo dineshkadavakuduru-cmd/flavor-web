@@ -17,7 +17,9 @@ module.exports = {
         fruit: "#e879c8",
         grain: "#f4d59e",
         bone: "#ede8dc",
-        ash: "#8b93a7",
+        // Muted label colour. Was #8b93a7, which slipped to 1.7:1 over a bright
+        // orb behind the glass panels; this clears 4.5:1 in that worst case.
+        ash: "#9ba2b4",
       },
       fontFamily: {
         display: ["var(--font-space-grotesk)", "Inter", "system-ui", "sans-serif"],

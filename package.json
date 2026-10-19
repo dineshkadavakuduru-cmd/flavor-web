@@ -7,6 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "validate:data": "tsx scripts/validate-data.ts",
+    "audit:browser": "node scripts/browser-audit.mjs",
+    "audit": "npm run validate:data && npm run audit:browser",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
@@ -35,6 +39,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
     "postcss": "^8.4.49",
+    "puppeteer-core": "^25.14.0",
     "sharp": "^0.35.5",
     "tailwindcss": "^3.4.14",
     "tsx": "^4.19.2",

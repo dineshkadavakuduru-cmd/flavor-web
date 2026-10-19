@@ -1,5 +1,0 @@
-# Flavor Web - 3D Ingredient Pairing Explorer
-User-agent: *
-Allow: /
-
-Sitemap: https://flavor-web.vercel.app/sitemap.xml

@@ -1,5 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import {
+  OG_IMAGE_PATH,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_URL,
+} from "@/lib/site";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -19,72 +26,86 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Flavor Web — 3D Ingredient Pairing Explorer",
-  description:
-    "A living constellation of flavor. Search an ingredient, fly to it, and see what it loves.",
-  metadataBase: new URL("https://flavor-web.vercel.app"),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  // Everything relative below resolves against the canonical origin, so
+  // canonical/OG URLs can never point at the legacy deployment.
+  metadataBase: new URL(SITE_URL),
   alternates: {
-    canonical: "https://flavor-web.vercel.app/",
+    canonical: "/",
   },
   openGraph: {
-    title: "Flavor Web — 3D Ingredient Pairing Explorer",
-    description:
-      "A living constellation of flavor. Search an ingredient, fly to it, and see what it loves.",
-    url: "https://flavor-web.vercel.app/",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    siteName: SITE_NAME,
     type: "website",
     locale: "en_US",
     images: [
       {
-        url: "/og-image.png",
+        url: OG_IMAGE_PATH,
         width: 1200,
         height: 630,
-        alt: "Flavor Web — 3D Ingredient Pairing Explorer",
+        alt: SITE_TITLE,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Flavor Web — 3D Ingredient Pairing Explorer",
-    description:
-      "A living constellation of flavor. Search an ingredient, fly to it, and see what it loves.",
-    images: ["https://flavor-web.vercel.app/og-image.png"],
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [OG_IMAGE_PATH],
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+    },
   },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
     apple: "/favicon.svg",
   },
-  manifest: "/manifest.json",
 };
 
-// next/font marks these Space Grotesk (font-grotesk) latin woff2 files with the
-// ".p." (preload) suffix, but Next 14 doesn't emit <link rel="preload"> tags in
-// the static HTML shell. Preload them explicitly so the primary font doesn't
-// arrive late and cause a FOUT. Hashes change only if the Google font version
-// changes — keep in sync with .next/static/media (see @font-face in built CSS).
-const FONT_GROTESK_PRELOADS = [
-  "/_next/static/media/36966cca54120369-s.p.woff2",
-  "/_next/static/media/558ca1a6aa3cb55e-s.p.woff2",
-];
+export const viewport: Viewport = {
+  themeColor: "#05060a",
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+  // Page zoom is deliberately left enabled (WCAG 1.4.4). The canvas keeps its
+  // own gestures via `touch-action: none`, so pinch on the header/panels still
+  // zooms text for low-vision users.
+};
+
+// Next 14.2 does not emit <link rel="preload"> for next/font in the static HTML
+// shell, so the display font arrives late and causes a FOUT. This is the Space
+// Grotesk file next/font marks with the ".p." suffix in .next/static/media.
+//
+// A previous revision also preloaded "/_next/static/media/558ca1a6aa3cb55e-s.p.woff2".
+// That file does not exist — 558ca1a6aa3cb55e is a JetBrains Mono file (which is
+// deliberately preload:false here) and it only exists without the ".p." suffix,
+// so the previous name 404'd on every page load. The hash changes if the Google
+// Font version changes; `npm run audit:browser` now asserts that every font URL
+// the shell references actually resolves.
+const FONT_GROTESK_PRELOAD = "/_next/static/media/36966cca54120369-s.p.woff2";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${jetBrainsMono.variable}`}>
       <body className="bg-void-950 font-grotesk text-bone antialiased">
-        {FONT_GROTESK_PRELOADS.map((href) => (
-          <link
-            key={href}
-            rel="preload"
-            href={href}
-            as="font"
-            type="font/woff2"
-            crossOrigin="anonymous"
-          />
-        ))}
+        <link
+          rel="preload"
+          href={FONT_GROTESK_PRELOAD}
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
         {children}
       </body>
     </html>

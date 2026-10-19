@@ -2,7 +2,8 @@
 
 > A living constellation of flavor. Search an ingredient, fly to it, and see what it loves.
 
-**Live demo:** https://food-jet-delta.vercel.app
+**Live demo (canonical):** https://flavor-web.vercel.app  
+The legacy `food` deployment (`food-jet-delta.vercel.app`) 308-redirects here — see [Deployment](#deployment).
 
 Instead of a recipe list or a data dashboard, Flavor Web renders ingredients as glowing orbs in a slowly rotating 3D "flavor galaxy." Click an orb (or search for it) and the camera flies to it while its pairings light up around it — classic combos burn as thick gold threads, wild experiments flicker as faint dashed ones.
 
@@ -33,6 +34,7 @@ Instead of a recipe list or a data dashboard, Flavor Web renders ingredients as 
 npm install
 npm run dev        # http://localhost:3000
 npm run build      # production check
+npm run audit      # data integrity + real-browser audit
 ```
 
 Optional — live Firestore instead of bundled JSON:
@@ -47,7 +49,7 @@ npm run seed                 # pushes src/data/*.json to Firestore
 `ingredients/{id}` → `{ name, category, description, color }`
 `pairings/{id}` → `{ ingredientA, ingredientB, strength: classic | strong | experimental, note? }`
 
-The dataset (`src/data/ingredients.json`, `src/data/pairings.json` — 102 ingredients, 158 pairings) is hand-curated and checked into the repo: tomato×basil, chocolate×chili, pork×apple, salmon×dill, strawberry×balsamic… Edit the JSON, not the database.
+The dataset (`src/data/ingredients.json`, `src/data/pairings.json` — 102 ingredients, 142 pairings) is hand-curated and checked into the repo: tomato×basil, chocolate×chili, pork×apple, salmon×dill, strawberry×balsamic… Edit the JSON, not the database.
 
 ## Project structure
 
@@ -66,6 +68,40 @@ DESIGN.md         # visual source of truth — read before restyling
 ## Design rules (from DESIGN.md)
 
 Game menu, not dashboard: near-black void, emissive orbs, hairline glass chrome. Nothing snaps — cameras ease, nodes drift, edges breathe. No purple-blue gradients, no default shadcn look, no photorealistic food.
+
+## Deployment
+
+There are two Vercel projects for this repo by history:
+
+| Project | Role |
+|---|---|
+| `flavor-web` | **Canonical.** Owns https://flavor-web.vercel.app. |
+| `food` | Legacy (`food-jet-delta.vercel.app`). Must never serve or be indexed. |
+
+Canonicalisation is enforced in code, not only in the dashboard:
+
+- `src/lib/site.ts` is the single source for the origin. `NEXT_PUBLIC_SITE_URL`
+  overrides the default `https://flavor-web.vercel.app` (set it when moving to a
+  custom domain); the canonical link, `og:url`, `og:image`, sitemap, robots and
+  redirect middleware all derive from it.
+- `vercel.json` permanently redirects the legacy host, and
+  `src/middleware.ts` redirects any other production host to the canonical one
+  (previews and localhost are exempt).
+- `.vercel/` is intentionally unlinked from the `food` project so a local
+  `vercel deploy` cannot target the legacy project by accident. Run
+  `vercel link` and pick `flavor-web`.
+
+The legacy project itself should be deleted once the redirect has been live for
+at least one crawl cycle (Vercel dashboard → `food` → Settings → Delete). Until
+then the committed redirect is what keeps it harmless; both projects build the
+same source, so the redirect ships with it.
+
+Validate canonical output after a deploy:
+
+```bash
+curl -sI https://food-jet-delta.vercel.app/ | head -1   # 308 → canonical
+npm run audit                                          # data + browser audit
+```
 
 ## Performance
 

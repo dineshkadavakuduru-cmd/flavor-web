@@ -13,7 +13,7 @@ Deep-space void `#05060a → #0e1220` radial vignette, never linear purple-blue 
 - dairy `#A8D0E6` glacial pale blue
 - grain `#F4D59E` toasted sand
 - other `#C0C0C0` moon silver
-Background stays near-black so glow carries. Text bone `#EDE8DC`, muted ash `#8B93A7`.
+Background stays near-black so glow carries. Text bone `#EDE8DC`, muted ash `#9BA2B4` (lifted from `#8B93A7`, which fell to 1.7:1 when a bloomed orb sat behind a glass panel).
 
 ## 3. Typography
 - Display: Space Grotesk 600, tight -0.04em, huge cinematic reveal (blur 8px → 0, y 24 → 0, 0.7s expo). Used ONLY for the focused ingredient name.
