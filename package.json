@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "validate:data": "tsx scripts/validate-data.ts",
     "audit:browser": "node scripts/browser-audit.mjs",
+    "smoke:redirect": "node scripts/smoke-redirect.mjs",
     "audit": "npm run validate:data && npm run audit:browser",
     "seed": "tsx scripts/seed.ts"
   },

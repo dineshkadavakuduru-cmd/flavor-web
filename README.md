@@ -91,17 +91,20 @@ Canonicalisation is enforced in code, not only in the dashboard:
   `vercel deploy` cannot target the legacy project by accident. Run
   `vercel link` and pick `flavor-web`.
 
-The legacy project itself should be deleted once the redirect has been live for
-at least one crawl cycle (Vercel dashboard → `food` → Settings → Delete). Until
-then the committed redirect is what keeps it harmless; both projects build the
-same source, so the redirect ships with it.
+Keep the `food` project available for existing bookmarks. Both projects build
+the same source. Share the canonical public URL and use
+`/?ingredient=tomato` for an ingredient bookmark.
 
 Validate canonical output after a deploy:
 
 ```bash
-curl -sI https://food-jet-delta.vercel.app/ | head -1   # 308 → canonical
-npm run audit                                          # data + browser audit
+npm run smoke:redirect
 ```
+
+The smoke check makes plain HTTPS GET requests with automatic redirects
+disabled. It requires one HTTP 308 from the legacy project with the exact
+canonical Location, followed by HTTP 200 from that URL. It covers the bare root,
+an encoded query with a repeated key, and a bookmarked ingredient.
 
 ## Performance
 

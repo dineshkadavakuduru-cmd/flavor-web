@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { Search, X } from "lucide-react";
 import type { PositionedNode } from "@/lib/graph";
 
@@ -9,6 +9,8 @@ interface Props {
   query: string;
   onQuery: (q: string) => void;
   onPick: (id: string) => void;
+  inputRef: RefObject<HTMLInputElement>;
+  loading: boolean;
   /** Active category filters — the typeahead never offers a hidden ingredient. */
   activeCategories?: Set<string>;
   testId?: string;
@@ -19,6 +21,8 @@ export default function SearchBar({
   query,
   onQuery,
   onPick,
+  inputRef,
+  loading,
   activeCategories,
   testId,
 }: Props) {
@@ -60,30 +64,32 @@ export default function SearchBar({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!open || results.length === 0) return;
+      if (e.key === "Escape" || e.key === "Tab") {
+        if (open && e.key === "Escape") e.preventDefault();
+        close();
+        return;
+      }
+      if (results.length === 0 || e.nativeEvent.isComposing) return;
 
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
+          setOpen(true);
           setHighlightedIndex((prev) => (prev + 1) % results.length);
           break;
         case "ArrowUp":
           e.preventDefault();
-          setHighlightedIndex((prev) => (prev - 1 + results.length) % results.length);
+          setOpen(true);
+          setHighlightedIndex((prev) => prev < 0 ? results.length - 1 : (prev - 1 + results.length) % results.length);
           break;
         case "Enter":
+          if (!open) return;
           e.preventDefault();
           if (highlightedIndex >= 0 && results[highlightedIndex]) {
             onPick(results[highlightedIndex].id);
           } else {
             onPick(results[0].id);
           }
-          close();
-          break;
-        case "Escape":
-          close();
-          break;
-        case "Tab":
           close();
           break;
       }
@@ -97,17 +103,27 @@ export default function SearchBar({
   };
 
   const activeOptionId =
-    highlightedIndex >= 0 && results[highlightedIndex]
+    open && highlightedIndex >= 0 && results[highlightedIndex]
       ? `search-option-${results[highlightedIndex].id}`
       : undefined;
 
   const showPanel = open && trimmed.length > 0;
 
+  useEffect(() => {
+    if (activeOptionId) document.getElementById(activeOptionId)?.scrollIntoView({ block: "nearest" });
+  }, [activeOptionId]);
+
   return (
-    <div className="relative w-full max-w-md">
-      <div className="glass ripple-btn flex items-center gap-3 rounded-full py-3 pl-5 pr-3 shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
+    <div
+      className="relative w-full max-w-md"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) close();
+      }}
+    >
+      <div className="glass flex items-center gap-3 rounded-full py-2 pl-5 pr-3 shadow-[0_8px_40px_rgba(0,0,0,0.5)] focus-within:ring-2 focus-within:ring-ember">
         <Search size={16} className="shrink-0 text-ash" aria-hidden="true" />
         <input
+          ref={inputRef}
           data-testid={testId}
           value={query}
           onChange={(e) => {
@@ -119,15 +135,17 @@ export default function SearchBar({
             setOpen(true);
             setHighlightedIndex(-1);
           }}
-          onBlur={() => setTimeout(() => setOpen(false), 140)}
+          onClick={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Search the galaxy…"
-          className="w-full bg-transparent font-mono text-[13px] tracking-wide text-bone placeholder:text-ash focus:outline-none"
+          className="min-h-8 w-full bg-transparent font-mono text-base tracking-wide text-bone placeholder:text-ash focus:outline-none md:text-sm"
           autoComplete="off"
+          enterKeyHint="search"
+          aria-label="Search ingredients"
           aria-autocomplete="list"
-          aria-controls="search-results"
+          aria-controls={showPanel ? "search-options" : undefined}
           aria-activedescendant={activeOptionId}
-          aria-expanded={open && results.length > 0}
+          aria-expanded={showPanel}
           role="combobox"
         />
         {query && (
@@ -135,8 +153,9 @@ export default function SearchBar({
             onClick={() => {
               onQuery("");
               setHighlightedIndex(-1);
+              inputRef.current?.focus();
             }}
-            className="magnetic rounded-full p-1.5 text-ash hover:bg-white/10 hover:text-bone focus-visible:outline-none"
+            className="magnetic rounded-full p-2 text-ash hover:bg-white/10 hover:text-bone"
             aria-label="Clear search"
           >
             <X size={14} />
@@ -147,64 +166,50 @@ export default function SearchBar({
       {showPanel && (
         <div
           id="search-results"
-          role="listbox"
-          aria-label="Search results"
-          className="glass cinematic-reveal absolute top-full z-50 mt-2 w-full overflow-hidden rounded-2xl p-1.5"
+          className="search-results glass absolute top-full z-50 mt-2 w-full overflow-y-auto rounded-2xl p-1.5"
         >
-          {results.length > 0 ? (
-            results.map((r, index) => (
-              <button
-                key={r.id}
-                id={`search-option-${r.id}`}
-                role="option"
-                aria-selected={index === highlightedIndex}
-                onClick={() => handleResultClick(r.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleResultClick(r.id);
-                  }
-                }}
-                onMouseEnter={() => setHighlightedIndex(index)}
-                className={`search-result flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.07] ${
-                  index === highlightedIndex ? "bg-white/[0.07]" : ""
-                }`}
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_12px_currentColor]"
-                  style={{ background: r.color, color: r.color }}
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-grotesk text-sm text-bone" title={r.name}>
-                    {r.name}
+          <div id="search-options" role="listbox" aria-label="Search results">
+            {results.length > 0 &&
+              results.map((r, index) => (
+                <button
+                  key={r.id}
+                  id={`search-option-${r.id}`}
+                  role="option"
+                  tabIndex={-1}
+                  aria-selected={index === highlightedIndex}
+                  onClick={() => handleResultClick(r.id)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className={`search-result flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.07] ${
+                    index === highlightedIndex ? "bg-white/10 ring-1 ring-inset ring-ember" : ""
+                  }`}
+                >
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_12px_currentColor]"
+                    style={{ background: r.color, color: r.color }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-grotesk text-sm text-bone" title={r.name}>
+                      {r.name}
+                    </span>
+                    <span className="block truncate font-mono text-[10px] uppercase tracking-[0.18em] text-ash">
+                      {r.category} · {r.pairingCount ?? 0} links
+                    </span>
                   </span>
-                  <span className="block truncate font-mono text-[10px] uppercase tracking-[0.18em] text-ash">
-                    {r.category} · {r.pairingCount ?? 0} links
-                  </span>
-                </span>
-              </button>
-            ))
-          ) : (
+                </button>
+              ))}
+          </div>
+          {results.length === 0 && (
             <div className="px-3 py-3" role="status">
               <p className="font-grotesk text-sm text-bone">
-                No ingredients match “{trimmed}”
+                {loading ? "Loading ingredients…" : <>No ingredients match “{trimmed}”</>}
               </p>
-              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ash">
-                {hiddenByFilters > 0
-                  ? `${hiddenByFilters} match${hiddenByFilters === 1 ? "" : "es"} hidden by the category filters`
-                  : "Try a shorter word, or search by flavour"}
-              </p>
-              {hiddenByFilters > 0 && (
-                <button
-                  onClick={() => {
-                    onQuery("");
-                    setHighlightedIndex(-1);
-                  }}
-                  className="mt-2 rounded-full border border-white/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-bone hover:bg-white/10"
-                >
-                  Clear search
-                </button>
+              {!loading && (
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ash">
+                  {hiddenByFilters > 0
+                    ? `${hiddenByFilters} match${hiddenByFilters === 1 ? "" : "es"} hidden by the category filters`
+                    : "Try a shorter word, or search by flavour"}
+                </p>
               )}
             </div>
           )}

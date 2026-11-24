@@ -15,6 +15,7 @@
  * SwiftShader software rasteriser, so fps is a floor, not what a real GPU does.
  */
 import puppeteer from "puppeteer-core";
+import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { join } from "node:path";
@@ -120,6 +121,12 @@ async function main() {
   console.log(`chrome: ${executablePath}`);
 
   try {
+    await auditDiscovery(browser);
+    if (process.argv.includes("--discovery")) {
+      process.exitCode = Number(results.some((result) => result.status === "FAIL"));
+      return;
+    }
+
     // ------------------------------------------------------------- 1. boot
     section("1. Boot & render (normal connection)");
     {
@@ -985,6 +992,140 @@ async function main() {
   for (const f of failed) console.log(`  FAIL  ${f.name}${f.detail ? ` — ${f.detail}` : ""}`);
   console.log("═".repeat(60));
   process.exit(failed.length ? 1 : 0);
+}
+
+async function auditDiscovery(browser) {
+  section("Discovery controls with a pending canvas and a mobile keyboard");
+  const input = '[data-testid="search-input"]';
+  const panel = '[data-testid="detail-panel"]';
+  const heading = `${panel} h2`;
+  const close = `${panel} [aria-label="Close panel"]`;
+  const pairing = `${panel} [role="listitem"]:first-child button`;
+
+  async function check(name, viewport, run) {
+    const page = await newPage(browser, { ...viewport, reducedMotion: "reduce" });
+    try {
+      await run(page);
+      record(name, "PASS");
+    } catch (error) {
+      record(name, "FAIL", error.message);
+    } finally {
+      await page.close();
+    }
+  }
+
+  for (const width of [360, 390]) {
+    await check(`${width}px touch discovery, including reduced keyboard viewport`, {
+      width, height: 800, isMobile: true, hasTouch: true,
+    }, async (page) => {
+      // Headless Chrome has no OS keyboard. Keep the layout viewport intact
+      // and simulate the visual viewport height and offset a keyboard reports.
+      await page.evaluateOnNewDocument(() => {
+        const viewport = window.visualViewport;
+        let keyboardOpen = false;
+        Object.defineProperties(viewport, {
+          height: { get: () => keyboardOpen ? 300 : window.innerHeight },
+          offsetTop: { get: () => keyboardOpen ? 18 : 0 },
+        });
+        window.setAuditKeyboard = (open) => {
+          keyboardOpen = open;
+          viewport.dispatchEvent(new Event("resize"));
+        };
+      });
+      await page.goto(BASE, { waitUntil: "domcontentloaded" });
+      const more = 'button[aria-label="Scroll to more categories"]';
+      const other = 'button[aria-label="Other category filter"]';
+      await page.waitForFunction((selector) => {
+        const button = document.querySelector(selector);
+        return button?.getAttribute("aria-disabled") === "false" && getComputedStyle(button).opacity === "1";
+      }, {}, more);
+      for (let i = 0; i < 6; i++) {
+        if (await page.$eval(more, (el) => el.getAttribute("aria-disabled")) === "true") break;
+        await page.tap(more);
+        await sleep(75);
+      }
+      assert.equal(await page.$eval(more, (el) => el.getAttribute("aria-disabled")), "true");
+      await page.tap(other);
+      await page.waitForSelector(`${other}[aria-pressed="false"]`);
+
+      await page.tap(input);
+      await page.evaluate(() => window.setAuditKeyboard(true));
+      await page.keyboard.type("Tomato");
+      await page.waitForSelector("#search-option-tomato", { visible: true });
+      assert.ok(await page.$eval("#search-option-tomato", (el) => {
+        const box = el.getBoundingClientRect();
+        return box.top >= visualViewport.offsetTop && box.bottom <= visualViewport.offsetTop + visualViewport.height;
+      }));
+      await page.tap("#search-option-tomato");
+      await page.waitForFunction((selector) => document.activeElement === document.querySelector(selector), {}, heading);
+      assert.match(await page.$eval(panel, (el) => el.textContent), /11 pairings/);
+      assert.ok(await page.$eval(panel, (el) => {
+        const box = el.getBoundingClientRect();
+        const search = document.querySelector('[data-testid="search-input"]').getBoundingClientRect();
+        return box.top >= search.bottom && box.bottom <= visualViewport.offsetTop + visualViewport.height;
+      }));
+      await page.tap(pairing);
+      await page.waitForFunction((selector) => {
+        const title = document.querySelector(selector);
+        return title && title.textContent !== "Tomato" && document.activeElement === title;
+      }, {}, heading);
+      await page.tap(close);
+      await page.waitForSelector(panel, { hidden: true });
+      assert.ok(await page.$eval(input, (el) => document.activeElement === el));
+    });
+  }
+
+  await check("Desktop keyboard flow while a cold canvas load is held", {}, async (page) => {
+    const chunk = findCanvasChunk();
+    assert.ok(chunk, "Expected a separate canvas chunk in the production build");
+    await page.setCacheEnabled(false);
+    await page.setRequestInterception(true);
+    let holdCanvas = true;
+    const canvasRequests = [];
+    page.on("request", (request) => {
+      if (holdCanvas && request.url().includes(chunk)) canvasRequests.push(request);
+      else void request.continue();
+    });
+
+    await page.goto(BASE, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('[data-testid="loading-screen"]');
+    await page.keyboard.press("Tab");
+    await page.waitForFunction((selector) => {
+      const field = document.querySelector(selector);
+      return field === document.activeElement && field.matches(":focus-visible")
+        && getComputedStyle(field.parentElement).boxShadow.includes("255, 179, 71");
+    }, {}, input);
+    await page.keyboard.type("Tomato");
+    await page.waitForSelector("#search-option-tomato");
+    assert.ok(canvasRequests.length > 0, "Canvas chunk should still be waiting while search returns data");
+    assert.ok(await page.$eval(input, (el) => {
+      const { x, y, width, height } = el.getBoundingClientRect();
+      return document.elementFromPoint(x + width / 2, y + height / 2) === el;
+    }));
+    await page.keyboard.press("ArrowDown");
+    await page.waitForSelector('#search-option-tomato[aria-selected="true"]');
+    await page.keyboard.press("Enter");
+    await page.waitForFunction((selector) => document.activeElement === document.querySelector(selector), {}, heading);
+    await page.keyboard.press("Tab");
+    assert.ok(await page.$eval(close, (el) => el === document.activeElement && getComputedStyle(el).outlineStyle === "solid"));
+    await page.keyboard.press("Tab");
+    assert.ok(await page.$eval(pairing, (el) => el === document.activeElement && getComputedStyle(el).outlineStyle === "solid"));
+    await page.keyboard.press("Enter");
+    await page.waitForFunction((selector) => {
+      const title = document.querySelector(selector);
+      return title && title.textContent !== "Tomato" && document.activeElement === title;
+    }, {}, heading);
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(panel, { hidden: true });
+    assert.ok(await page.$eval(input, (el) => document.activeElement === el));
+    await waitError(page);
+    await page.click(input);
+    await page.keyboard.type("Tomato");
+    await page.waitForSelector("#search-option-tomato");
+    holdCanvas = false;
+    await Promise.all(canvasRequests.map((request) => request.continue()));
+    await waitGalaxyReady(page);
+  });
 }
 
 async function measure(page, cdp, ms) {

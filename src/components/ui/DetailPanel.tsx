@@ -1,6 +1,7 @@
 "use client";
 
 import { X, ArrowUpRight, Sparkles } from "lucide-react";
+import type { RefObject } from "react";
 import { CATEGORY_LABELS, STRENGTH_CONFIG } from "@/types";
 import type { PositionedNode } from "@/lib/graph";
 import type { Pairing } from "@/types";
@@ -11,6 +12,7 @@ interface Props {
   nodeById: Map<string, PositionedNode>;
   onClose: () => void;
   onPick: (id: string) => void;
+  headingRef: RefObject<HTMLHeadingElement>;
 }
 
 const strengthDot: Record<Pairing["strength"], string> = {
@@ -25,7 +27,7 @@ const STRENGTH_LABEL: Record<Pairing["strength"], string> = {
   experimental: "Lab",
 };
 
-export default function DetailPanel({ node, pairings, nodeById, onClose, onPick }: Props) {
+export default function DetailPanel({ node, pairings, nodeById, onClose, onPick, headingRef }: Props) {
   if (!node) return null;
   const related = pairings
     .filter((p) => p.ingredientA === node.id || p.ingredientB === node.id)
@@ -47,43 +49,52 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
     <aside
       key={node.id}
       data-testid="detail-panel"
-      className="glass cinematic-reveal pointer-events-auto relative w-full max-w-[380px] overflow-hidden rounded-2xl"
+      className="glass pointer-events-auto relative flex min-h-0 w-full max-w-[380px] flex-col overflow-hidden rounded-2xl"
       style={{ borderTop: `3px solid ${node.color}` }}
       role="region"
-      aria-label={`${node.name} details`}
+      aria-labelledby="detail-heading"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose();
+      }}
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-25"
         style={{ background: `radial-gradient(60% 100% at 50% 0%, ${node.color}, transparent)` }}
         aria-hidden="true"
       />
-      <div className="relative max-h-[70dvh] overflow-y-auto scroll-slim p-6">
-        <div className="flex items-start justify-between gap-4">
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-ash">
-            {CATEGORY_LABELS[node.category]} · {node.pairingCount ?? 0} pairings
+      <div className="relative flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-3 md:px-6 md:pt-5">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-ash">
+            {CATEGORY_LABELS[node.category]} · {related.length} pairings
           </p>
-          <button
-            onClick={onClose}
-            className="magnetic shrink-0 rounded-full p-1.5 text-ash hover:bg-white/10 hover:text-bone focus-visible:outline-none"
-            aria-label="Close panel"
+          <h2
+            id="detail-heading"
+            tabIndex={-1}
+            ref={headingRef}
+            className={`font-display mt-1 rounded-sm font-semibold leading-[1.05] text-bone [overflow-wrap:anywhere] ${
+              longName ? "text-2xl md:text-3xl" : "text-3xl md:text-4xl"
+            }`}
           >
-            <X size={16} />
-          </button>
+            {node.name}
+          </h2>
         </div>
-
-        <h2
-          className={`font-display mt-2 font-semibold leading-[1.05] text-bone [overflow-wrap:anywhere] ${
-            longName ? "text-3xl" : "text-4xl"
-          }`}
+        <button
+          onClick={onClose}
+          className="magnetic flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash hover:bg-white/10 hover:text-bone"
+          aria-label="Close panel"
         >
-          {node.name}
-        </h2>
-        <p className="mt-3 font-grotesk text-[14px] leading-relaxed text-bone/75">
+          <X size={16} />
+        </button>
+      </div>
+      <div className="scroll-slim relative min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 pt-3 md:px-6 md:pb-6">
+        <p className="font-grotesk text-sm leading-relaxed text-bone/75">
           {node.description}
         </p>
 
         <div
-          className="mt-5 flex flex-wrap items-center gap-4 border-y border-white/[0.07] py-3"
+          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-white/[0.07] py-2"
           role="group"
           aria-label="Pairing strength legend"
         >
@@ -112,50 +123,50 @@ export default function DetailPanel({ node, pairings, nodeById, onClose, onPick 
           </p>
         ) : (
           <div
-            className="scroll-slim mt-2 max-h-[38vh] overflow-y-auto pr-1"
+            className="mt-2"
             role="list"
             aria-label={`${node.name} pairings`}
           >
             {related.map(({ pairing, other }) => (
-              <button
-                key={pairing.id}
-                onClick={() => onPick(other.id)}
-                className="detail-link group flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
-                role="listitem"
-                aria-label={`${other.name}, ${STRENGTH_LABEL[pairing.strength]} pairing${pairing.note ? `, ${pairing.note}` : ""}`}
-              >
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: other.color, boxShadow: `0 0 10px ${other.color}` }}
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1 font-grotesk text-sm text-bone">
-                    <span className="truncate" title={other.name}>
-                      {other.name}
-                    </span>
-                    <ArrowUpRight
-                      size={13}
-                      className="shrink-0 opacity-0 transition-opacity group-hover:opacity-70"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  {pairing.note && (
-                    <span className="block truncate font-grotesk text-xs text-ash">
-                      {pairing.note}
-                    </span>
-                  )}
-                </span>
-                <span
-                  className="shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em]"
-                  style={{
-                    borderColor: `${strengthDot[pairing.strength]}44`,
-                    color: strengthDot[pairing.strength],
-                  }}
+              <div key={pairing.id} role="listitem" className="px-0.5">
+                <button
+                  onClick={() => onPick(other.id)}
+                  className="detail-link group flex min-h-11 w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
+                  aria-label={`${other.name}, ${STRENGTH_LABEL[pairing.strength]} pairing${pairing.note ? `, ${pairing.note}` : ""}`}
                 >
-                  {STRENGTH_LABEL[pairing.strength]}
-                </span>
-              </button>
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: other.color, boxShadow: `0 0 10px ${other.color}` }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1 font-grotesk text-sm text-bone">
+                      <span>
+                        {other.name}
+                      </span>
+                      <ArrowUpRight
+                        size={13}
+                        className="shrink-0 opacity-0 transition-opacity group-hover:opacity-70"
+                        aria-hidden="true"
+                      />
+                    </span>
+                    {pairing.note && (
+                      <span className="block font-grotesk text-xs leading-relaxed text-ash">
+                        {pairing.note}
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className="shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em]"
+                    style={{
+                      borderColor: `${strengthDot[pairing.strength]}44`,
+                      color: strengthDot[pairing.strength],
+                    }}
+                  >
+                    {STRENGTH_LABEL[pairing.strength]}
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
         )}

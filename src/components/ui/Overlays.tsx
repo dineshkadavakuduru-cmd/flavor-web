@@ -3,11 +3,11 @@
 import { Dices, Info, Loader2, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-export function SurpriseButton({ onClick }: { onClick: () => void }) {
+export function SurpriseButton({ onClick }: { onClick: (trigger: HTMLButtonElement) => void }) {
   return (
     <button
-      onClick={onClick}
-      className="glass ripple-btn magnetic group flex items-center gap-2.5 rounded-full py-3 pl-4 pr-5 focus-visible:outline-none"
+      onClick={(event) => onClick(event.currentTarget)}
+      className="glass ripple-btn magnetic group flex items-center gap-2.5 rounded-full py-3 pl-4 pr-5"
       style={{ boxShadow: "0 0 24px rgba(255,179,71,0.18), 0 0 40px rgba(0,0,0,0.5)" }}
     >
       <Dices size={16} className="text-ember transition-transform duration-300 group-hover:rotate-180" aria-hidden="true" />
@@ -44,7 +44,7 @@ export function InfoModal() {
       </button>
       {open && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="pointer-events-auto fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         >
           <div

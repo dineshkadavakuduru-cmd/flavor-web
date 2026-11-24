@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGraphData } from "@/hooks/useGraphData";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useDeviceProfile } from "@/hooks/useDeviceProfile";
+import { useDiscoveryViewport } from "@/hooks/useDiscoveryViewport";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { neighborMap } from "@/lib/graph";
@@ -66,6 +67,13 @@ export default function Home() {
   const isOnline = useOnlineStatus();
   const prefersReducedMotion = useReducedMotion();
   const device = useDeviceProfile(isMobile, prefersReducedMotion);
+  const main = useRef<HTMLElement>(null);
+  const graph = useRef<HTMLDivElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const panelHeading = useRef<HTMLHeadingElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const focusPanel = useRef(false);
+  useDiscoveryViewport(main);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -85,10 +93,8 @@ export default function Home() {
   const [failure, setFailure] = useState<"canvas" | "context" | "chunk" | null>(null);
 
   const dataReady = !loading && nodes.length > 0;
-  // Overlay stays up until data is loaded AND the 3D canvas has initialized.
-  // The canvas mounts behind the opaque overlay as soon as data is ready, so a
-  // slow WebGL init can still succeed after the timeout fires; it is keyed by
-  // refreshKey so retries remount it and onCreated fires again.
+  // The overlay covers the graph until the canvas initializes. Discovery
+  // controls sit above it and can use the data while the canvas is pending.
   const galaxyReady = dataReady && canvasReady && !failure;
 
   // Timer starts on mount / on retry and stops as soon as the galaxy is up —
@@ -179,6 +185,27 @@ export default function Home() {
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
 
+  useEffect(() => {
+    if (!selected || !focusPanel.current) return;
+    focusPanel.current = false;
+    panelHeading.current?.focus({ preventScroll: true });
+  }, [selected]);
+
+  const openPanel = (id: string) => {
+    if (id === selectedId) {
+      panelHeading.current?.focus({ preventScroll: true });
+      return;
+    }
+    focusPanel.current = true;
+    setSelectedId(id);
+  };
+
+  const closePanel = () => {
+    setSelectedId(null);
+    (returnFocus.current ?? graph.current)?.focus({ preventScroll: true });
+    returnFocus.current = null;
+  };
+
   // ------------------------------------------------------------------ deep links
   // `?ingredient=<id>` is the shareable form of "I am looking at this orb".
   // The requested id is captured on mount, before any state exists, and applied
@@ -262,6 +289,8 @@ export default function Home() {
 
   const handleGalaxyKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (e.target !== e.currentTarget) return;
+      returnFocus.current = null;
       switch (e.key) {
         case "ArrowRight":
         case "ArrowDown":
@@ -315,11 +344,12 @@ export default function Home() {
       return next;
     });
 
-  const surprise = () => {
+  const surprise = (trigger: HTMLButtonElement) => {
     const eligible = nodes.filter((n) => (n.pairingCount ?? 0) >= 3);
     if (!eligible.length) return;
     const pick = eligible[Math.floor(Math.random() * eligible.length)];
-    setSelectedId(pick.id);
+    returnFocus.current = trigger;
+    openPanel(pick.id);
     setQuery("");
   };
 
@@ -339,8 +369,9 @@ export default function Home() {
               : false;
 
   return (
-    <main className="relative h-dvh w-full overflow-hidden bg-void-950">
+    <main ref={main} className="relative h-dvh w-full overflow-hidden bg-void-950">
       <div
+        ref={graph}
         // Keyboard entry point for the graph itself: orbs are WebGL instances
         // and cannot be tabbed to, so the canvas is a single focusable surface
         // with arrow-key navigation between an ingredient and its pairings.
@@ -350,7 +381,7 @@ export default function Home() {
         aria-label="Flavor galaxy. Arrow keys move to an ingredient or its pairings, Enter selects, Escape deselects."
         aria-describedby="galaxy-help"
         onKeyDown={handleGalaxyKeyDown}
-        className="absolute inset-0"
+        className="absolute inset-0 z-0 focus-visible:-outline-offset-2"
       >
         {dataReady && !failure && (
           <ErrorBoundary key={refreshKey} fallback={null} onError={handleCanvasError}>
@@ -361,7 +392,10 @@ export default function Home() {
               selectedId={selectedId}
               searchQuery={query}
               activeCategories={activeCategories}
-              onSelect={setSelectedId}
+              onSelect={(id) => {
+                returnFocus.current = null;
+                setSelectedId(id);
+              }}
               isMobile={isMobile}
               dpr={device.dpr}
               allowPostProcessing={device.allowPostProcessing}
@@ -388,7 +422,7 @@ export default function Home() {
         {announcement}
       </div>
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-40 flex flex-col items-center gap-3 px-4 pt-4 md:pt-6">
+      <header className="discovery-header pointer-events-none absolute inset-x-0 z-40 flex flex-col items-center gap-3 px-4 pt-4 md:pt-6">
         <div className="pointer-events-auto flex w-full max-w-3xl flex-col items-center gap-3">
           <div className="flex items-center gap-3">
             <span className="h-2 w-2 animate-pulse-slow rounded-full bg-ember shadow-[0_0_16px_#ffb347]" />
@@ -400,23 +434,24 @@ export default function Home() {
             nodes={nodes}
             query={query}
             onQuery={setQuery}
-            onPick={setSelectedId}
+            onPick={(id) => {
+              returnFocus.current = searchInput.current;
+              setQuery("");
+              openPanel(id);
+            }}
+            inputRef={searchInput}
+            loading={!dataReady}
             activeCategories={activeCategories}
             testId="search-input"
           />
         </div>
 
-        {/* Category chips — single horizontal scroll row, visible on all breakpoints */}
-        <div className="pointer-events-auto w-full max-w-3xl overflow-x-auto">
-          <div className="flex w-max items-center justify-center gap-2 px-1 py-1.5">
-            <CategoryChips
-              active={activeCategories}
-              onToggle={toggleCategory}
-              onReset={() => setActiveCategories(new Set(ALL))}
-              testId="category-chips"
-            />
-          </div>
-        </div>
+        <CategoryChips
+          active={activeCategories}
+          onToggle={toggleCategory}
+          onReset={() => setActiveCategories(new Set(ALL))}
+          testId="category-chips"
+        />
 
         {noCategories && (
           <p
@@ -428,21 +463,21 @@ export default function Home() {
         )}
       </header>
 
-      {/* Desktop detail panel — only render when there's a selection (keeps it out of SSR output) */}
       {selected && (
-        <div className="pointer-events-none absolute bottom-24 right-4 top-36 z-40 hidden w-[380px] max-w-[calc(100vw-2rem)] md:block">
-          <DetailPanel node={selected} pairings={pairings} nodeById={nodeById} onClose={() => setSelectedId(null)} onPick={setSelectedId} />
+        <div className="discovery-panel pointer-events-none absolute inset-x-3 z-30 mx-auto flex max-w-[380px] flex-col md:bottom-24 md:left-auto md:right-4 md:top-36 md:w-[380px]">
+          <DetailPanel
+            key={selected.id}
+            node={selected}
+            pairings={pairings}
+            nodeById={nodeById}
+            onClose={closePanel}
+            onPick={openPanel}
+            headingRef={panelHeading}
+          />
         </div>
       )}
 
-      {/* Mobile detail panel */}
-      {selected && isMobile && (
-        <div className="pointer-events-auto absolute inset-x-3 bottom-20 z-50 md:hidden">
-          <DetailPanel node={selected} pairings={pairings} nodeById={nodeById} onClose={() => setSelectedId(null)} onPick={setSelectedId} />
-        </div>
-      )}
-
-      <footer className="absolute inset-x-0 bottom-0 z-40 flex items-end justify-between gap-3 p-4 md:p-6">
+      <footer className="discovery-footer pointer-events-none absolute inset-x-0 bottom-0 z-50 flex items-end justify-between gap-3 p-4 md:p-6 [&_button]:pointer-events-auto">
         <div className="flex items-center gap-2">
           <InfoModal />
           <span className="label-shadow hidden font-mono text-[10px] uppercase tracking-[0.2em] text-ash sm:block">
